@@ -1,0 +1,3 @@
+/usr/sbin/corosync	--	gen_context(system_u:object_r:corosync_exec_t, s0)
+/var/run/corosync\.pid  --      gen_context(system_u:object_r:corosync_var_run_t,s0)
+/var/run/corosync(/.*)? 	gen_context(system_u:object_r:corosync_var_run_t,s0)

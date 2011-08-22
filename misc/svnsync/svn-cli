@@ -1,0 +1,27 @@
+#!/bin/ksh
+
+# Make sure it's called properly
+if [[ $SSH_ORIGINAL_COMMAND != "svn-cli" || -t 0 ]] ; then
+  echo "Have a nice day" >&2
+  exit 1
+fi
+
+REPOSBASE=file:///var/svn/repos
+
+while read command options
+do
+  echo "$options" | egrep -q '[^[:alnum:][:space:]._-]'
+  if [[ $? -eq 0 ]] ; then
+    echo "Invalid command" >&2
+    exit 1
+  fi 
+  case $command in
+    sync)
+        /usr/bin/svnsync sync --non-interactive --quiet $REPOSBASE/$options
+        ;;
+       *)
+        echo "Unknown command" >&2
+        exit 1
+        ;;
+  esac
+done

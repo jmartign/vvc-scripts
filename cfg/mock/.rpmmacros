@@ -1,0 +1,6 @@
+%_topdir      %(echo $HOME)/rpmbuild
+%_smp_mflags  -j3
+%__arch_install_post   /usr/lib/rpm/check-rpaths   /usr/lib/rpm/check-buildroot
+%_gpg_name vvc@chepkov.com
+%packager Vadym Chepkov <vvc@chepkov.com>
+%dist .el5

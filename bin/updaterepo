@@ -1,0 +1,16 @@
+#!/bin/ksh
+
+REPOBASE=/var/www/vvc/rpms/redhat/5
+KEEP=3
+
+umask 002
+
+repomanage -o -k $KEEP $REPOBASE | xargs -r rm
+createrepo -q -c $REPOBASE/SRPMS/cache --update $REPOBASE/SRPMS
+chmod -R g+w $REPOBASE/SRPMS/cache
+
+for arch in i386 x86_64
+do
+  createrepo -q -g repodata/comps.xml -c $REPOBASE/$arch/cache --update $REPOBASE/$arch
+  chmod -R g+w $REPOBASE/$arch/repodata $REPOBASE/$arch/cache
+done

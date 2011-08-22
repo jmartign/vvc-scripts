@@ -1,0 +1,2 @@
+KERNEL=="sd*[a-z]", BUS=="scsi", SYSFS{vendor}=="VVC", PROGRAM="/etc/udev/scripts/iscsidev.sh %b",SYMLINK+="iscsi/%c{1}/lun%c{2}/disk"
+KERNEL=="sd*[0-9]", BUS=="scsi", SYSFS{vendor}=="VVC", PROGRAM="/etc/udev/scripts/iscsidev.sh %b",SYMLINK+="iscsi/%c{1}/lun%c{2}/part%n"

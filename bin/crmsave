@@ -1,0 +1,7 @@
+#!/bin/bash
+
+PATH=$PATH:/usr/sbin
+BACKUP=/var/backup/config.crm
+
+[ -f $BACKUP ] && mv -f ${BACKUP} ${BACKUP}.old
+crm configure save ${BACKUP} || mv -f ${BACKUP}.old ${BACKUP}

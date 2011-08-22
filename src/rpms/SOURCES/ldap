@@ -1,0 +1,267 @@
+#!/bin/sh
+# $Id: ldap 299 2011-02-17 00:16:12Z vvc $
+#
+# Resource script for slapd daemon
+#
+# Description:  Manages slpad daemon as an OCF resource in 
+#               an High Availability setup.
+#
+# Author: Vadym Chepkov <vvc@chepkov.com>
+# License: GNU General Public License (GPL) 
+#
+#
+#	usage: $0 {start|stop|status|monitor|validate-all|meta-data}
+#
+#	The "start" arg starts rsyncd.
+#
+#	The "stop" arg stops it.
+#
+# OCF parameters:
+# OCF_RESKEY_binpath
+# OCF_RESKEY_configfile
+# OCF_RESKEY_urls
+# OCF_RESKEY_user
+#
+# Note:This RA requires that the slapd config files has a "pidfile" 
+# entry so that it is able to act on the correct process
+##########################################################################
+# Initialization:
+
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
+
+USAGE="Usage: $0 {start|stop|status|monitor|validate-all|meta-data}";
+
+##########################################################################
+
+usage() 
+{
+	echo $USAGE >&2
+}
+
+meta_data() 
+{
+cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="ldap">
+<version>1.0</version>
+<longdesc lang="en">
+This script manages slapd daemon
+</longdesc>
+<shortdesc lang="en">OCF Resource Agent compliant slapd daemon script.</shortdesc>
+
+<parameters>
+
+<parameter name="binpath">
+<longdesc lang="en">
+The slapd binary path.
+For example, "/usr/sbin/slapd"
+</longdesc>
+<shortdesc lang="en">Full path to the slapd binary</shortdesc>
+<content type="string" default="/usr/sbin/slapd"/>
+</parameter>
+
+<parameter name="configfile">
+<longdesc lang="en">
+The slapd daemon configuration file name with full path. 
+For example, "/etc/slapd.conf"
+</longdesc>
+<shortdesc lang="en">Configuration file name with full path</shortdesc>
+<content type="string" default="/etc/openldap/slapd.conf" />
+</parameter>
+
+<parameter name="urls">
+<longdesc lang="en">
+A space separated list of URLs to be served enclosed in single quotes
+For example, 'ldap://127.0.0.1:9009/ ldaps:/// ldapi:///'
+</longdesc>
+<shortdesc lang="en">URLs to serve</shortdesc>
+<content type="string" default=""/>
+</parameter>
+
+<parameter name="user">
+<longdesc lang="en">
+Run us non-privileged user,
+ldap by default
+</longdesc>
+<shortdesc lang="en">user id</shortdesc>
+<content type="string" default="ldap"/>
+</parameter>
+</parameters>
+
+<actions>
+<action name="start" timeout="90"/>
+<action name="stop" timeout="100"/>
+<action name="monitor" depth="0" timeout="30s" interval="60s" start-delay="5s" />
+<action name="validate-all" timeout="30s"/>
+<action name="meta-data"  timeout="5s"/>
+</actions>
+</resource-agent>
+END
+exit $OCF_SUCCESS
+}
+
+get_pid_and_conf_file()
+{
+	if [ -n "$OCF_RESKEY_configfile" ]; then
+		CONF_FILE=$OCF_RESKEY_configfile
+	else
+		CONF_FILE="/etc/openldap/slapd.conf"
+	fi
+               
+	grep -v "^#" "$CONF_FILE" | grep "pidfile" > /dev/null
+	if [ $? -eq 0 ]; then
+		PIDFILE=`grep -v "^#" "$CONF_FILE" | grep "pidfile" | awk '{ print $2 }'`
+	fi
+}
+
+slapd_status()
+{
+	if [ -n "$PIDFILE" -a -f $PIDFILE ]; then
+		# slapd is probably running
+		PID=`cat $PIDFILE`
+		if [ -n "$PID" ]; then
+			if ps -p $PID | grep slapd >/dev/null ; then
+				ocf_log info "slapd daemon running"
+				return $OCF_SUCCESS
+			else
+				ocf_log info "slapd daemon is not running but pid file exists"
+				return $OCF_ERR_GENERIC
+			fi
+		else
+			ocf_log err "PID file empty!"
+			return $OCF_ERR_GENERIC
+		fi
+	fi
+		
+	# slapd is not running
+	ocf_log info "slapd daemon is not running"
+	return $OCF_NOT_RUNNING
+}
+
+slapd_start()
+{
+	# if slapd is running return success
+	slapd_status
+	retVal=$?
+	if [ $retVal -eq $OCF_SUCCESS ]; then
+		exit $OCF_SUCCESS
+	elif [ $retVal -ne $OCF_NOT_RUNNING ]; then
+		ocf_log err "Error. Unknown status."
+		exit $OCF_ERR_GENERIC
+	fi
+
+	if [ -n "$OCF_RESKEY_binpath" ]; then
+		COMMAND="$OCF_RESKEY_binpath"
+	else
+		COMMAND="/usr/sbin/slapd"
+	fi
+	if [ -n "$OCF_RESKEY_user" ]; then
+		COMMAND="$COMMAND -u $OCF_RESKEY_user"
+	fi
+	if [ -n "$OCF_RESKEY_configfile" ]; then
+		COMMAND="$COMMAND -f $OCF_RESKEY_configfile"
+	fi
+	if [ -n "$OCF_RESKEY_urls" ]; then
+		COMMAND="$COMMAND -h $OCF_RESKEY_urls"
+	fi
+
+	if  grep -v "^#" "$CONF_FILE" | grep "pidfile" > /dev/null ; then
+		$COMMAND;
+		if [ $? -ne 0 ]; then
+			ocf_log err "Error. slapd daemon returned error $?."
+			exit $OCF_ERR_GENERIC
+		fi
+	else
+		ocf_log err "Error. \"pidfile\" entry required in the slapd config file by slapd OCF RA."
+		return $OCF_ERR_GENERIC
+	fi
+
+	ocf_log info "Started slapd daemon."
+	exit $OCF_SUCCESS
+}
+
+
+slapd_stop()
+{
+	if slapd_status ; then
+		PID=`cat $PIDFILE`
+		if [ -n "$PID" ] ; then
+			kill $PID
+			if [ $? -ne 0 ]; then
+				kill -SIGKILL $PID
+				if [ $? -ne 0 ]; then
+					ocf_log err "Error. Could not stop slapd daemon."
+					return $OCF_ERR_GENERIC
+				fi
+			fi
+			rm $PIDFILE 2>/dev/null
+		fi
+	fi
+	ocf_log info "Stopped slapd daemon."
+	exit $OCF_SUCCESS
+}
+
+slapd_monitor()
+{
+	slapd_status
+}
+
+slapd_validate_all()
+{
+	if [ -n "$OCF_RESKEY_binpath" -a ! -x "$OCF_RESKEY_binpath" ]; then
+		ocf_log err "Binary path $OCF_RESKEY_binpath does not exist."
+		exit $OCF_ERR_ARGS
+	fi
+	if [ -n "$OCF_RESKEY_configfile" -a ! -f "$OCF_RESKEY_configfile" ]; then
+		ocf_log err "Config file $OCF_RESKEY_configfile does not exist."
+		exit $OCF_ERR_ARGS
+	fi
+
+	return $OCF_SUCCESS
+}
+
+
+#
+# Main
+#
+ 
+if [ $# -ne 1 ]; then
+	usage
+	exit $OCF_ERR_ARGS
+fi
+
+case $1 in
+	start)	get_pid_and_conf_file
+		slapd_start
+		;;
+	
+	stop)	get_pid_and_conf_file
+		slapd_stop
+		;;
+
+	status)	get_pid_and_conf_file
+		slapd_status
+		;;
+
+	monitor)get_pid_and_conf_file
+		slapd_monitor
+		;;
+
+	validate-all)	get_pid_and_conf_file
+			slapd_validate_all
+			;;
+
+	meta-data)	meta_data
+			;;
+
+	usage)	usage
+		exit $OCF_SUCCESS
+		;;
+
+	*)	usage
+		exit $OCF_ERR_UNIMPLEMENTED
+		;;
+esac
+

@@ -1,0 +1,272 @@
+#!/bin/sh
+# $Id: daemon 299 2011-02-17 00:16:12Z vvc $
+#
+# Resource script for any daemon
+#
+# Description:  Manages any daemon as an OCF resource in 
+#               an High Availability setup.
+#
+# Author: Vadym Chepkov <vvc@chepkov.com>
+# License: GNU General Public License (GPL) 
+#
+#	usage: $0 {start|stop|status|monitor|validate-all|meta-data}
+#
+# OCF parameters:
+# OCF_RESKEY_binpath
+# OCF_RESKEY_pidfile
+# OCF_RESKEY_user
+# OCF_RESKEY_options
+# OCF_RESKEY_monitor_script
+#
+##########################################################################
+# Initialization:
+
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
+
+USAGE="Usage: $0 {start|stop|status|monitor|validate-all|meta-data}";
+
+##########################################################################
+
+usage() 
+{
+	echo $USAGE >&2
+}
+
+daemon_meta_data() 
+{
+cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="daemon">
+<version>1.0</version>
+<longdesc lang="en">
+OCF Resource Agent compliant script to manage any daemon
+daemon has to detach from the terminal and create a pid file
+</longdesc>
+<shortdesc lang="en">
+This script manages any daemon
+</shortdesc>
+
+<parameters>
+<parameter name="binpath" unique="1" required="1">
+<longdesc lang="en">
+The daemon binary.
+For example, "/usr/sbin/cvsd"
+</longdesc>
+<shortdesc lang="en">Full path to the daemon binary</shortdesc>
+<content type="string" default=""/>
+</parameter>
+
+<parameter name="pidfile" unique="1" required="1">
+<longdesc lang="en">
+Daemon's pid file name with full path. 
+For example, "/var/run/cvsd.pid"
+</longdesc>
+<shortdesc lang="en">pid file name with full path</shortdesc>
+<content type="string" default="" />
+</parameter>
+
+<parameter name="user" unique="1" required="0">
+<longdesc lang="en">
+Run us non-privileged user,
+root by default
+</longdesc>
+<shortdesc lang="en">user id</shortdesc>
+<content type="string" default="root"/>
+</parameter>
+
+<parameter name="options" unique="1" required="0">
+<longdesc lang="en">
+Additional command line options for the daemon, for example
+--config=/etc/cvsd/cvsd.conf
+</longdesc>
+<shortdesc lang="en">command line options id</shortdesc>
+<content type="string" default=""/>
+</parameter>
+
+<parameter name="monitor_script" unique="1" required="0">
+<longdesc lang="en">
+A custom monitor script to provide additional health checks
+Has to return 0 if the resource is healthy
+</longdesc>
+<shortdesc lang="en">custom monitor script</shortdesc>
+<content type="string" default=""/>
+</parameter>
+
+</parameters>
+
+<actions>
+<action name="start" timeout="10s"/>
+<action name="stop" timeout="10s"/>
+<action name="monitor" depth="0" timeout="10s" interval="10s" />
+<action name="validate-all" timeout="5s"/>
+<action name="meta-data"  timeout="5s"/>
+</actions>
+
+</resource-agent>
+END
+exit $OCF_SUCCESS
+}
+
+daemon_status()
+{
+	if [ -f "$pidfile" ]; then
+		PID=$(head -n 1 $pidfile)
+		if [ -n "$PID" ]; then
+			if kill -0 $PID 2>/dev/null && ps -o comm -p $PID | tail -n +2 | grep -qw $daemon_name ; then
+				return  0
+			fi
+		fi
+	fi
+		
+	return 1
+}
+
+daemon_start()
+{
+	# if daemon is running return success
+	if daemon_status ; then
+		ocf_log info "daemon $daemon_name is already running"
+		exit $OCF_SUCCESS
+	fi
+
+	if [ "$OCF_RESKEY_user" = "root" ] ; then
+		SU=""
+	else
+		SU="su $OCF_RESKEY_user -c "
+	fi 
+
+	eval "$SU $OCF_RESKEY_binpath $OCF_RESKEY_options"
+	if [ $? -ne 0 ]; then
+		ocf_log err "daemon $daemon_name returned error $?"
+                exit $OCF_ERR_GENERIC
+        fi
+
+	ocf_log info "daemon $daemon_name started"
+	exit $OCF_SUCCESS
+}
+
+
+daemon_stop()
+{
+	if ! daemon_status ; then
+		ocf_log info "daemon $daemon_name wasn't running"
+                exit $OCF_SUCCESS
+        fi
+	if [ -n "$OCF_RESKEY_CRM_meta_timeout" ]; then
+		# Allow 2/3 of the action timeout for the orderly shutdown
+		# (The origin unit is ms, hence the conversion)
+		stop_timeout=$(expr $OCF_RESKEY_CRM_meta_timeout / 1500)
+	else
+		stop_timeout=10
+	fi
+	PID=$(head -n 1 $pidfile)
+	ocf_log info "killing daemon PID $PID"
+	kill $PID > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		i=0
+		while [ $i -lt $stop_timeout ]
+                do
+                        if ! daemon_status
+                        then
+                                rm -f $pidfile
+                                exit $OCF_SUCCESS
+                        fi
+                        sleep 1 
+                        i=$(expr $i + 1)
+                done
+		ocf_log warn "daemon $daemon_name stop pid $PID with SIGTERM failed/timed out, now sending SIGKILL"
+		kill -9 $PID > /dev/null 2>&1
+		if ! daemon_status
+                then
+                        ocf_log warn "daemon $daemon_name $PID SIGKILL did the job."
+                        exit $OCF_SUCCESS
+                else
+                        ocf_log err "daemon $daemon_name PID $PID failed to stop - even with SIGKILL"
+                        exit $OCF_ERR_GENERIC
+                fi
+	else
+		ocf_log err "daemon $daemon_name killing PID $PID FAILED"
+		exit $OCF_ERR_GENERIC
+	fi
+}
+
+daemon_monitor()
+{
+	if ! daemon_status ; then
+		ocf_log info "daemon $daemon_name is not running"
+		exit $OCF_NOT_RUNNING
+	elif [ $OCF_CHECK_LEVEL = 0 ] ; then
+		ocf_log info "daemon $daemon_name is running"
+		exit $OCF_SUCCESS
+	elif [ -n "$OCF_RESKEY_monitor_script" ] ; then
+		${OCF_RESKEY_monitor_script} 
+		if [ $? -eq 0 ] ; then
+			ocf_log info "daemon $daemon_name is running, confirmed by monitor_script"
+			exit $OCF_SUCCESS
+		else
+			ocf_log info "daemon $daemon_name is not running, detected by monitor_script"
+			exit $OCF_NOT_RUNNING
+		fi
+	else
+		ocf_log info "daemon $daemon_name is running"
+		exit $OCF_SUCCESS
+	fi
+}
+
+daemon_validate_all()
+{
+	if [ ! -x "$OCF_RESKEY_binpath" ]; then
+		ocf_log err "daemon $OCF_RESKEY_binpath is not available for execution"
+		exit $OCF_ERR_INSTALLED
+	fi
+	if [ -n "$OCF_RESKEY_monitor_script" -a ! -x "$OCF_RESKEY_monitor_script" ]; then
+		ocf_log err "script $OCF_RESKEY_monitor_script is not available for execution"
+		exit $OCF_ERR_INSTALLED
+	fi
+	if ! id "$OCF_RESKEY_user" >/dev/null 2>&1 ; then
+		ocf_log err "user $OCF_RESKEY_user does not exist."
+		exit $OCF_ERR_CONFIGURED
+	fi
+}
+
+
+#
+# Main
+#
+ 
+if [ $# -ne 1 ]; then
+	usage
+	exit $OCF_ERR_ARGS
+else
+	if [ -n "$OCF_RESKEY_binpath" ] ; then
+		daemon_name=$(basename $OCF_RESKEY_binpath)
+	fi
+	pidfile=${OCF_RESKEY_pidfile}
+	: ${OCF_RESKEY_user:="root"}
+fi
+
+check_binary expr
+
+case $1 in
+	start)	daemon_start ;;
+	
+	stop)	daemon_stop ;;
+
+	monitor) daemon_monitor ;;
+
+	validate-all) daemon_validate_all 
+		exit $OCF_SUCCESS ;;
+
+	meta-data) daemon_meta_data ;;
+
+	usage)	usage
+		exit $OCF_SUCCESS
+		;;
+
+	*)	usage
+		exit $OCF_ERR_UNIMPLEMENTED
+		;;
+esac
+

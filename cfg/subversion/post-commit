@@ -1,0 +1,4 @@
+#!/bin/sh
+# $Id: post-commit 15 2008-09-27 05:03:35Z vvc $
+/usr/bin/svn-mailer -c -d "$1" -r "$2" -f /etc/svn-mailer.cfg
+exit 0

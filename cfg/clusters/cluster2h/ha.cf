@@ -1,0 +1,22 @@
+# Logging
+debug				1
+use_logd			false
+logfacility			local3
+ 
+# Misc Options
+traditional_compression 	off
+compression			bz2
+ 
+# Communications
+mcast                           eth0 239.255.20.0 694 1 0
+mcast                           eth1 239.255.20.1 694 1 0
+node				c20
+node				c21
+   
+# Thresholds (in seconds)
+keepalive			1
+warntime			6
+deadtime			10
+initdead			30
+
+pacemaker			respawn

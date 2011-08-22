@@ -1,0 +1,30 @@
+#!/usr/bin/perl
+
+use strict;
+use IO::Socket;
+
+my $spamd_tcp_port = 783;
+my $timeout = 5 ; # seconds
+
+my $sock = IO::Socket::INET->new( PeerAddr => 'localhost', PeerPort => $spamd_tcp_port, Proto => "tcp", Timeout => $timeout);
+my $return;
+
+if ($sock && $sock->connected()) {
+  eval {
+		print $sock "PING SPAMC/1.0\n";
+		local $SIG{ALRM} = sub {die "Timeout"};
+		alarm $timeout;
+		$return = <$sock>;
+		alarm 0;
+  };
+  if ( defined ($@) && $@ eq "Timeout" ) {
+		exit 0;
+	}
+  if ($return !~ /SPAMD.+PONG/ )
+	{
+		exit 0;
+	} else {
+		exit 1;
+  }
+}
+exit 0;

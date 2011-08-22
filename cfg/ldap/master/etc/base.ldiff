@@ -1,0 +1,20 @@
+dn: dc=chepkov,dc=lan
+dc: chepkov
+objectClass: top
+objectClass: domain
+
+dn: ou=People,dc=chepkov,dc=lan
+ou: People
+objectClass: top
+objectClass: organizationalUnit
+
+dn: ou=Group,dc=chepkov,dc=lan
+ou: Group
+objectClass: top
+objectClass: organizationalUnit
+
+dn: ou=Daemon,dc=chepkov,dc=lan
+ou: Daemon
+objectClass: top
+objectClass: organizationalUnit
+

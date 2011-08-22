@@ -1,0 +1,158 @@
+#!/bin/sh
+# $Id: link 299 2011-02-17 00:16:12Z vvc $
+# Resource script for any daemon
+#
+# Description:  Pseudo agent to create a symbolic link
+#               in High Availability setup.
+#
+# Author: Vadym Chepkov <vvc@chepkov.com>
+# License: GNU General Public License (GPL) 
+#
+#       usage: $0 {start|stop|monitor|validate-all|meta-data}
+#
+# OCF parameters:
+# OCF_RESKEY_link
+# OCF_RESKEY_target
+#
+#######################################################################
+# Initialization:
+
+: ${OCF_FUNCTIONS_DIR=${OCF_ROOT}/lib/heartbeat}
+. ${OCF_FUNCTIONS_DIR}/ocf-shellfuncs
+
+#######################################################################
+
+meta_data() {
+	cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="link">
+<version>1.0</version>
+
+<longdesc lang="en">
+Pseudo agent to create a symbolic link
+in High Availability setup.
+</longdesc>
+<shortdesc lang="en">symbolic link resource agent</shortdesc>
+
+<parameters>
+
+<parameter name="link" unique="0" required="1">
+<longdesc lang="en">
+symbolic link to create
+</longdesc>
+<shortdesc lang="en">symbolic link</shortdesc>
+<content type="string" default="" />
+</parameter>
+
+<parameter name="target" unique="0" required="1">
+<longdesc lang="en">
+target file for the symbolic link
+</longdesc>
+<shortdesc lang="en">target file</shortdesc>
+<content type="string" default="" />
+</parameter>
+
+</parameters>
+
+<actions>
+<action name="start"        timeout="5" start-delay="5" />
+<action name="stop"         timeout="5" />
+<action name="monitor"      timeout="5" interval="60" depth="0" />
+<action name="meta-data"    timeout="5" />
+<action name="validate-all" timeout="5" />
+</actions>
+</resource-agent>
+END
+}
+
+#######################################################################
+
+link_usage() {
+	cat <<END
+usage: $0 {start|stop|monitor|validate-all|meta-data}
+END
+}
+
+link_start() {
+  if [ -e ${OCF_RESKEY_link} -a ! -h ${OCF_RESKEY_link} ]; then
+    ocf_log err "${OCF_RESKEY_link} is not a symbolic link"
+    exit $OCF_ERR_GENERIC
+  fi
+  ln -snf ${OCF_RESKEY_target} ${OCF_RESKEY_link}
+  if [ $? -eq 0 ]; then
+    ocf_log info "symbolic link ${OCF_RESKEY_link} created"
+    return $OCF_SUCCESS
+  else
+    ocf_log err "couldn't create symbolic link ${OCF_RESKEY_link}: $?"
+    exit $OCF_ERR_GENERIC
+  fi
+}
+
+link_stop() {
+  if [ -h ${OCF_RESKEY_link} ]; then
+    rm -f ${OCF_RESKEY_link}
+    if [ $? -ne 0 ] ; then
+      ocf_log err "couldn't delete symbolic link ${OCF_RESKEY_link}: $?"
+      exit $OCF_ERR_GENERIC
+    fi
+  fi
+# Don't fail if link is not a symbolic link or it will trigger stonith
+  return $OCF_SUCCESS
+}
+
+link_monitor() {
+  if [ -e ${OCF_RESKEY_link} -a ! -h ${OCF_RESKEY_link} ]; then
+    ocf_log err "${OCF_RESKEY_link} is not a symbolic link"
+    exit $OCF_ERR_GENERIC
+  fi
+  if [ -h ${OCF_RESKEY_link} ]; then
+    target=`readlink ${OCF_RESKEY_link}`
+    if [ ${OCF_RESKEY_target} = $target ]; then
+      return $OCF_SUCCESS
+    fi
+  fi
+  return $OCF_NOT_RUNNING
+}
+
+link_validate() {
+  if [ -e ${OCF_RESKEY_link} -a ! -h ${OCF_RESKEY_link} ]; then
+    ocf_log err "${OCF_RESKEY_link} is not a symbolic link"
+    exit $OCF_ERR_ARGS
+  fi
+  if [ ! -e ${OCF_RESKEY_target} ]; then
+    ocf_log err "${OCF_RESKEY_target} does not exist"
+    exit $OCF_ERR_ARGS
+  fi
+  if [ ${OCF_RESKEY_link} = ${OCF_RESKEY_target} ]; then
+    ocf_log err "Don't link to itself"
+    exit $OCF_ERR_ARGS
+  fi
+  return $OCF_SUCCESS
+}
+
+if [ $# -ne 1 ]; then
+        usage
+        exit $OCF_ERR_ARGS
+fi
+
+check_binary readlink
+
+case $__OCF_ACTION in
+meta-data)	meta_data
+		exit $OCF_SUCCESS
+		;;
+start)		link_start;;
+stop)		link_stop;;
+monitor)	link_monitor;;
+reload)		ocf_log info "Reloading..."
+	        link_start
+		;;
+validate-all)	link_validate;;
+usage|help)	link_usage
+		exit $OCF_SUCCESS
+		;;
+*)		link_usage
+		exit $OCF_ERR_UNIMPLEMENTED
+		;;
+esac

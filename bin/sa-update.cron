@@ -1,0 +1,11 @@
+#!/bin/bash
+
+sleep $(expr $RANDOM % 7200)
+# Only restart spamd if sa-update returns 0, meaning it updated the rules
+/usr/bin/sa-update && (
+    /usr/bin/sa-compile >/dev/null 2>&1 || echo sa-compile failed >&2
+	if [ -x /sbin/restorecon ]; then
+  		/sbin/restorecon -R /var/lib/spamassassin/compiled
+	fi
+	/etc/init.d/spamassassin condrestart > /dev/null
+)

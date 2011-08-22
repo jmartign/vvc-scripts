@@ -1,0 +1,22 @@
+diff -ur MQSeries-1.30.orig/MQClient/Makefile.PL MQSeries-1.30/MQClient/Makefile.PL
+--- MQSeries-1.30.orig/MQClient/Makefile.PL	2009-07-20 13:39:07.000000000 -0600
++++ MQSeries-1.30/MQClient/Makefile.PL	2009-07-31 07:56:43.000000000 -0600
+@@ -313,8 +313,8 @@
+     # are there others in common use that don't
+     # use these flags?
+     #
+-    my $lddlflags = " -shared -Wl,-rpath -Wl,$rpath";
+-
++    my $lddlflags = " -shared";
++if(0){
+     if ( $Config{use64bitall} ) {
+         unless ( $lddlflags =~ /64$/ ) {
+             $lddlflags .= '64';
+@@ -337,6 +337,7 @@
+         $lddlflags = " -shared -Wl,-rpath -Wl,$rpath";
+         $extra_args{LDDLFLAGS} .= $lddlflags;
+     }
++}
+ } elsif ($Config{archname} =~ /^sun/) {
+     if ($Config{cc} =~ /^gcc/) {
+         #

@@ -1,0 +1,10 @@
+kernel = "/root/xen/vmlinuz-xen-centos5"
+ramdisk = "/root/xen/initrd-xen-centos5.img"
+extra = "headless ks=http://chepkov.com/svn/config/kickstart/centos-xen.cfg"
+name = "xen1"
+memory = "256"
+disk = [ 'phy:///dev/vg0/xen1,xvda,w', ]
+vif = [ 'mac=00:16:3e:00:00:02,bridge=xenbr0', ]
+vcpus=1
+on_reboot = 'destroy'
+on_crash = 'destroy'

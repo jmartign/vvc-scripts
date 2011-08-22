@@ -1,0 +1,5 @@
+javac *java
+rmic RegistryRMIImplementation
+rmiregistry &
+java -Djava.security.policy=policy.txt RegistryRMIServer &
+java -Djava.security.policy=policy.txt RegistryRMIClient localhost LSP QUERY GLOBAL Hello

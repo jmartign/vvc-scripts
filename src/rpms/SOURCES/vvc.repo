@@ -1,0 +1,13 @@
+[vvc]
+name=VVC Repository
+baseurl=http://www.chepkov.com/rpms/redhat/$releasever/$basearch/
+enabled=1
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/VVC-GPG-KEY
+
+[vvc-source]
+name=VVC Repository - Source
+baseurl=http://www.chepkov.com/rpms/redhat/$releasever/SRPMS/
+enabled=0
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/VVC-GPG-KEY

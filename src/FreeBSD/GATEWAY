@@ -1,0 +1,137 @@
+machine		i386
+cpu		I686_CPU
+ident		GATEWAY
+options         INCLUDE_CONFIG_FILE
+
+options 	SCHED_4BSD		# 4BSD scheduler
+options 	PREEMPTION		# Enable kernel thread preemption
+options 	INET			# InterNETworking
+options 	FFS			# Berkeley Fast Filesystem
+options 	SOFTUPDATES		# Enable FFS soft updates support
+options 	UFS_ACL			# Support for access control lists
+options 	UFS_DIRHASH		# Improve performance on big directories
+options 	PROCFS			# Process filesystem (requires PSEUDOFS)
+options 	PSEUDOFS		# Pseudo-filesystem framework
+options 	COMPAT_43		# Compatible with BSD 4.3 [KEEP THIS!]
+options 	SYSVSHM			# SYSV-style shared memory
+options 	SYSVMSG			# SYSV-style message queues
+options 	SYSVSEM			# SYSV-style semaphores
+options 	_KPOSIX_PRIORITY_SCHEDULING # POSIX P1003_1B real-time extensions
+options 	KBD_INSTALL_CDEV	# install a CDEV entry in /dev
+options 	ADAPTIVE_GIANT		# Giant mutex is adaptive.
+
+options		SMP
+device		apic			# I/O APIC
+
+# Bus support.
+device		pci
+
+# Floppy drives
+device		fdc
+
+# ATA and ATAPI devices
+device		ata
+device		atadisk		# ATA disk drives
+device		atapicd		# ATAPI CDROM drives
+options 	ATA_STATIC_ID	# Static device numbering
+
+# atkbdc0 controls both the keyboard and the PS/2 mouse
+device		atkbdc		# AT keyboard controller
+device		atkbd		# AT keyboard
+device		kbdmux		# keyboard multiplexer
+device		vga		# VGA video card driver
+device		speaker
+
+# syscons is the default console driver, resembling an SCO console
+device		sc
+
+# Serial (COM) ports
+device		sio		# 8250, 16[45]50 based serial ports
+
+# Parallel port
+device		ppc
+device		ppbus		# Parallel port bus (required)
+device		lpt		# Printer
+
+# PCI Ethernet NICs.
+device		em		# Intel PRO/1000 adapter Gigabit Ethernet Card
+
+# PCI Ethernet NICs that use the common MII bus controller code.
+# NOTE: Be sure to keep the 'device miibus' line in order to use these NICs!
+device		miibus		# MII bus support
+device		bge		# Broadcom BCM570xx Gigabit Ethernet
+
+# Pseudo devices.
+device		loop		# Network loopback
+device		random		# Entropy device
+device		ether		# Ethernet support
+device		ppp		# Kernel PPP
+device		tun		# Packet tunnel.
+device		pty		# Pseudo-ttys (telnet etc)
+device		md		# Memory "disks"
+device		gif		# IPv6 and IPv4 tunneling
+device          pf		# PF OpenBSD packet-filter firewall
+device          pflog		# logging support interface for PF
+device          gre		# IP over IP tunneling
+device		tap		# Virtual Ethernet driver
+device		snp
+device		vlan		# VLAN support
+
+# The `bpf' device enables the Berkeley Packet Filter.
+# Be aware of the administrative consequences of enabling this!
+# Note that 'bpf' is required for DHCP.
+device		bpf		# Berkeley packet filter
+
+# USB support
+device		ohci		# OHCI PCI->USB interface
+device		usb		# USB Bus (required)
+device		ugen		# Generic
+device		uhid		# "Human Interface Devices"
+device		ukbd		# Keyboard
+
+options         TCP_SIGNATURE
+
+options         NETGRAPH                #netgraph(4) system
+options         NETGRAPH_SOCKET
+options         NETGRAPH_IFACE
+options         NETGRAPH_PPP
+options         NETGRAPH_BPF
+options         NETGRAPH_VJC
+options         NETGRAPH_PPTPGRE
+options         NETGRAPH_KSOCKET
+options         NETGRAPH_MPPC_ENCRYPTION
+options         NETGRAPH_ASYNC
+options         NETGRAPH_BRIDGE
+options         NETGRAPH_CISCO
+options         NETGRAPH_ECHO
+options         NETGRAPH_ETHER
+options         NETGRAPH_FRAME_RELAY
+options         NETGRAPH_HOLE
+options         NETGRAPH_LMI
+options         NETGRAPH_ONE2MANY
+options         NETGRAPH_PPPOE
+options         NETGRAPH_RFC1490
+options         NETGRAPH_TEE
+options         NETGRAPH_TTY
+options         NETGRAPH_UI
+
+options		IPSEC
+options		IPSEC_NAT_T
+device		enc
+device		crypto
+device		cryptodev
+
+options         ALTQ
+options         ALTQ_CBQ
+options         ALTQ_RED
+options         ALTQ_RIO
+options         ALTQ_HFSC
+options         ALTQ_PRIQ
+options         ALTQ_NOPCC      # Required for SMP builds !!
+
+# SMB bus
+
+device          smbus
+device          amdpm
+device          amdsmb
+device          smb

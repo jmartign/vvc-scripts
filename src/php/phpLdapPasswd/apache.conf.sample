@@ -1,0 +1,9 @@
+# Example of Apache configuration
+
+Alias /password /usr/local/phpLdapPasswd
+
+<Directory /usr/local/phpLdapPasswd>
+  DirectoryIndex password.php
+  Options SymLinksIfOwnerMatch
+  AllowOverride FileInfo Limit
+</Directory>

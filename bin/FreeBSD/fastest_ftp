@@ -1,0 +1,233 @@
+#!/usr/bin/perl
+#
+#  Find fastest FTP server script for FreeBSD - v0.1
+#  Copyright 2002 A. Robinson (ajr@subdimension.com)
+#
+
+# we want to do this before the other modules so it fails quickly
+# for those without the Time::HiRes module. We print a friendly
+# error so newbies aren't completely stuck:
+BEGIN {
+  eval("use Time::HiRes qw(gettimeofday)");
+  if ($@) {
+    my $err;
+    $err  = "\nYou need the Time::HiRes perl module, you can either:\n\n";
+    $err .= "1. Load it from CPAN:\n\n";
+    $err .= "     # perl -MCPAN -e 'install Time::HiRes'\n\n";
+    $err .= "2. Fetch it as a package:\n\n";
+    $err .= "     # pkg_add -r p5-Time-HiRes\n\n";
+    $err .= "3. Compile it from the ports collection:\n\n";
+    $err .= "     # cd /usr/ports/devel/p5-Time-HiRes ; make install clean\n\n";
+    die $err;
+  }
+}
+
+# standard modules in perl distribution which _should_ be there
+use strict;
+use IO::Socket;
+use Getopt::Std;
+
+# we build a list of servers from the countries either specified on the
+# command line, taken from @LOCAL_CC, or we use all the servers.
+# Using all the servers will take some time, but is quite interesting!
+
+my @COUNTRIES = (); # we add to this later
+
+my @LOCAL_CC = qw( us ca ); # edit this for countries which
+                                           # are fairly close to you
+
+my @ALL_CC = qw( ar au br ca cn cz dk ee fi fr de hk hu is ie il jp kr lv
+                 nz pt pl ro ru za sk si es se tw ua uk us sa th );
+
+# How many servers has each country got?
+
+my %NUMBER_OF_SERVERS = (
+  'ar' => 1,  'au' => 4,  'br' => 7, 'ca' => 1,
+  'cn' => 1,  'cz' => 1,  'dk' => 3, 'ee' => 1,
+  'fi' => 1,  'fr' => 8,  'de' => 7, 'hu' => 1,
+  'is' => 1,  'ie' => 1,  'il' => 2, 'jp' => 6,
+  'kr' => 6,  'lv' => 1,  'nz' => 1, 'pt' => 2,
+  'pl' => 1,  'ro' => 1,  'ru' => 4, 'za' => 3,
+  'sk' => 1,  'si' => 1,  'es' => 1, 'se' => 3,
+  'tw' => 4,  'ua' => 1,  'uk' => 5, 'us' => 13,
+  'hk' => 0,  'sa' => 0,  'th' => 0,
+);
+
+# list of servers not conforming the scheme above, put them in this format:
+#  'country' => ['server1.somedomain.com','server2.whereever.net','xxx'],
+#
+my %FQDN = ( 'hk' => ['ftp.hk.super.net'],
+             'sa' => ['ftp.isu.net.sa'],
+             'th' => ['ftp.nectec.or.th'],
+           );
+
+my $FTP_PORT = 21;     # we attempt to connect on this port from an
+                       # unprivaleged local port
+
+my $DNS_TIMEOUT = 2;   # this is the timeout for dns lookups
+my $FTP_TIMEOUT = 2;   # the timeout for the connect to the ftp server
+
+# now we parse the command line with Getopt::Std, telling us which
+# country we are in and overriding the verbosity level
+
+my $VERBOSE = 1;    # default is yes
+my %opt = ();       # holder for command line options
+
+getopts("hvqc:", \%opt); # we need the ':' to store the actual values of
+                         # the -c switch
+
+if ( $opt{h} ) { Usage(); } # display help, see below for Usage() sub
+
+if ( $opt{v} and $opt{q} ) { # can't do verbose and quiet at the same time
+  Usage('-v and -q mutually exclusive');
+}
+
+if ( $opt{v} ) { $VERBOSE = 1; }  # set how noisy we are
+if ( $opt{q} ) { $VERBOSE = 0; }
+
+# if we have any server overrides then check to see if they are in
+# the ALL_CC array and push them into the COUNTRIES arrry for the
+# build. 
+
+if ( $opt{c} ) {
+  my %i = ();
+
+  for ( split(/,/,$opt{c}),@ALL_CC ) { $i{$_}++ } # count number of times
+                                                  # the country crops up
+
+  for ( keys %i ) { push(@COUNTRIES,$_) if $i{$_} >= 2 } # build array
+}
+elsif ( @LOCAL_CC ) {    # otherwise we want to use the local countries
+  @COUNTRIES = @LOCAL_CC;
+}
+else {
+  @COUNTRIES = @ALL_CC;  # failing that, use them all
+}
+
+sub Usage {
+  my $error = shift;
+  print "Error: $error\n" if $error;
+  print "Usage: $0 [-h] [-v\|-q] [-c aa,bb,cc]\n";
+  print "Where: -h           prints this screen\n";
+  print "       -v           verbose mode\n";    
+  print "       -q           quiet mode\n";
+  print "       -c aa,bb,cc  queries servers in countries aa,bb,cc\n";
+  exit;
+}
+
+
+# now we build an array of servers
+
+print "Querying servers in countries: @COUNTRIES\n" if $VERBOSE;
+my @SERVERS = ();
+
+foreach my $CC ( @COUNTRIES ) {
+
+  # For all the countries except the US, the server names are 
+  # ftpXX.country.freebsd.org for numbers greater than one and
+  # just ftp.country.freebsd.org for the first one.
+
+  for ( my $i=1; $i<=$NUMBER_OF_SERVERS{$CC}; $i++ ) {
+    if ( $CC eq 'us' ) {
+      push(@SERVERS,"ftp$i.freebsd.org");
+    }
+    else {
+      if ( $i == 1 ) { push(@SERVERS,"ftp.$CC.freebsd.org"); }
+      else { push(@SERVERS,"ftp$i.$CC.freebsd.org"); }
+    }
+  }
+
+  # add those oddball servers
+  if ( $FQDN{$CC} ) {
+    @SERVERS = ( @SERVERS,@{$FQDN{$CC}} );
+  }
+}
+
+# now we get to the fun part of looking up the servers and connecting
+# to them whilst timing how long the connection took
+
+my %TIME = ();
+
+foreach my $server (@SERVERS) {
+
+  my $ip_addr = (); # get ip address before attempting to connect, and
+                    # wrap gethostbyname in an eval block to timeout
+
+  sub timeout { die "TIMEOUT\n" }; # replacement signal
+  $SIG{ALRM} = \&timeout;
+
+  eval {
+    alarm($DNS_TIMEOUT);                     # set timeout...
+    $ip_addr = (gethostbyname($server))[4];  # lookup server within $TIMEOUT
+    alarm(0);                                # done, cancel alarm
+  };
+
+  if ($@ =~ /^TIMEOUT/ ) {  # we timed out
+    print "==> DNS lookup timed out for $server\n" if $VERBOSE;
+    next;
+  }
+  elsif (! $ip_addr ) {     # no such host
+    print "==> DNS lookup failed for $server\n" if $VERBOSE;
+    next;
+  }
+
+  # connect to IP address of server
+  print "==> Connecting to $server [",
+         join(".",unpack("C4",$ip_addr)),  # stored packed in memory
+          "]...\n" if $VERBOSE;
+
+  my $time_before = gettimeofday();    # start timing....
+
+  my $remote = IO::Socket::INET->new( Proto=>'tcp',
+                                      PeerAddr=>$server,
+                                      PeerPort=>$FTP_PORT,
+                                      Reuse=>1,
+                                      Timeout=>$FTP_TIMEOUT,
+                                    );
+
+  my $time_after = gettimeofday();     # .... end timing
+
+  if ( $@ ) {  # was there an error?
+
+    if ( $VERBOSE ) {   # we want to know what, so strip off module name
+                        # and print it out
+      my $error = ();   
+      ($error = $@) =~ s/^IO::Socket::INET\s*:\s*(.*)/$1/;
+      print "    - error: $error\n";
+    }
+
+    next; # skip to the next one
+  }
+
+  if ( defined($remote) and $remote->opened ) { # did we get a valid connection?
+    my $reply = $remote->getline;               # what did the server say?
+    chomp($reply);                              # remove newline
+    close $remote;                              # close connection
+    my $time_taken = $time_after-$time_before;  # calculate time
+
+    print "    - server replied: $reply\n" if $VERBOSE;
+    print "    - time taken: $time_taken\n" if $VERBOSE;
+
+    # if the server replied 'OK', i.e. not overloaded, save the timing
+    $TIME{$server} = $time_taken if ( $reply =~ m/^220/ );
+  }
+}
+
+# now we output the fastest
+
+if ( %TIME ) { # did we get *any* servers?
+
+  my @fastest = (); # sort for the fastest
+  for ( sort { $TIME{$a} <=> $TIME{$b} } keys %TIME ) { push(@fastest,$_) }
+
+  # if we are verbose, print the gold, silver and bronze medalists
+  if ( $VERBOSE ) {
+    print "\nSpeed Daemons:\n"       if $fastest[0];
+    print "    - 1st: $fastest[0]\n" if $fastest[0];
+    print "    - 2nd: $fastest[1]\n" if $fastest[1];
+    print "    - 3rd: $fastest[2]\n" if $fastest[2];
+  }
+  else {  # otherwise just output the fastest.
+    print $fastest[0],"\n";
+  }  
+}

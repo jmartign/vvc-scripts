@@ -1,0 +1,13 @@
+<!-- Comment -->
+<keystores>
+   <keystore
+	location="/opt/IBM/mqsi/6.0/jre/lib/security/cacerts"
+	type="JKS"
+   />
+   <keystore
+	location="key.kdb"
+	type="CMS"
+	nbrdays="100"
+	password="mypassword"
+   />
+</keystores>

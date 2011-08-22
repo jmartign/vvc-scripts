@@ -1,0 +1,13 @@
+policy_module(corosync, 1.0.0)
+
+type corosync_t;
+type corosync_exec_t;
+init_daemon_domain(corosync_t, corosync_exec_t)
+role system_r types corosync_t;
+
+type corosync_var_run_t;
+files_pid_file(corosync_var_run_t)
+
+manage_files_pattern(corosync_t, corosync_var_run_t, corosync_var_run_t)
+manage_dirs_pattern(corosync_t, corosync_var_run_t, corosync_var_run_t)
+files_pid_filetrans(corosync_t, corosync_var_run_t, file)

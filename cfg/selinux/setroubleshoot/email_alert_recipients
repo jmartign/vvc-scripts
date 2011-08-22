@@ -1,0 +1,2 @@
+# filter_type: after_first never always 
+root@localhost	filter_type=never

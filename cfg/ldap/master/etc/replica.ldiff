@@ -1,0 +1,6 @@
+dn: cn=replica,ou=Daemon,dc=chepkov,dc=lan
+objectClass: top
+objectClass: person
+sn: Daemon
+cn: replica
+userPassword:: e1NTSEF9clhBNTF6RE9KOUI5TXNTSjhsM25vK1ZmS0NNU2Z2V2s=

@@ -1,0 +1,14 @@
+#!/bin/sh
+
+CAPABILITIES=$3
+
+if [ -n "$CAPABILITIES" ] ; then
+  echo $CAPABILITIES | grep -qw mergeinfo
+  if [ $? -eq 0 ] ; then
+    exit 0
+  fi
+fi
+
+echo "Your SVN client doesn't have mergeinfo capability" >&2
+exit 1
+

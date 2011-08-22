@@ -1,0 +1,35 @@
+body {
+  margin: 10px;
+  color: #000;
+  background-color: #CCFFFF;
+}
+
+.phpLdapPasswdError {
+  background: yellow;
+  border:1px solid black;
+  padding: 5px;
+}
+
+.phpLdapPasswdSuccess {
+  background:#00FF00;
+  border:1px solid black;
+  font-weight:bold;
+  text-align:center;
+  padding: 5px;
+}
+
+.phpLdapPasswdForm {
+  background: #d3d3d3;
+  border-radius: 30px;
+  -moz-border-radius: 30px;
+  padding: 10px;
+}
+
+.phpLdapPasswdSuggestions {
+  background: #d3d3d3;
+  border-radius: 30px;
+  -moz-border-radius: 30px;
+  font-family: courier;
+  text-align: center;
+  padding: 15px;
+}
