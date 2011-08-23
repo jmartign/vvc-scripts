@@ -114,7 +114,7 @@ foreach my $line (<$fh>) {
         # Check for errors
         $np->add_message( CRITICAL, ": $1 not installed" );
     }
-    elsif ( $line =~ m/\s*(\w+):.*(fail-count=\d+)/ ) {
+    elsif ( $line =~ m/\s*(\S+?):.*(fail-count=\d+)/ ) {
 
         # Check Resources Fail count
         $np->add_message( WARNING, ": $1 failure detected, $2" );
