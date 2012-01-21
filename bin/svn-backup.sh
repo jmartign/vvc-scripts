@@ -1,6 +1,4 @@
 #!/bin/ksh
-# $Id: svn-backup.sh 314 2011-04-22 18:04:03Z vvc $
-
 # SOURCEHOST has to be configured in ~/.ssh/config, i.e.
 # Host		svndev
 # BatchMode	yes
@@ -16,7 +14,7 @@ REPOSDIR=$BACKUPDIR/repos
 set -e
 
 # Initialize backup structure
-if [[ ! -d BACKUPDIR/hooks ]] ; then
+if [[ ! -d $BACKUPDIR/hooks ]] ; then
   mkdir -p $BACKUPDIR/hooks
   cat > $BACKUPDIR/hooks/pre-revprop-change <<EOF
 #!/bin/sh
